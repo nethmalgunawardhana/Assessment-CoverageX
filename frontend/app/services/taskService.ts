@@ -1,9 +1,3 @@
-/**
- * Task API Service
- * Handles all backend API calls for todo task management
- * Follows REST conventions and error handling best practices
- */
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 // Type definitions
@@ -12,6 +6,8 @@ export interface Task {
   title: string;
   description: string | null;
   completed: boolean;
+  priority: 'Low' | 'Moderate' | 'High';
+  status: 'Not Started' | 'In Progress' | 'Completed';
   created_at: string;
   updated_at: string;
 }
@@ -19,12 +15,16 @@ export interface Task {
 export interface CreateTaskRequest {
   title: string;
   description?: string;
+  priority?: 'Low' | 'Moderate' | 'High';
+  status?: 'Not Started' | 'In Progress' | 'Completed';
 }
 
 export interface UpdateTaskRequest {
   title?: string;
   description?: string;
   completed?: boolean;
+  priority?: 'Low' | 'Moderate' | 'High';
+  status?: 'Not Started' | 'In Progress' | 'Completed';
 }
 
 export interface ApiResponse<T> {
@@ -94,10 +94,10 @@ async function apiCall<T>(
 export const taskService = {
   /**
    * Fetch all tasks (incomplete tasks by default)
-   * @param limit - Number of tasks to fetch (default: 5)
+   * @param limit - Number of tasks to fetch (default: 10)
    * @param skip - Number of tasks to skip for pagination (default: 0)
    */
-  async getTasks(limit: number = 5, skip: number = 0): Promise<Task[]> {
+  async getTasks(limit: number = 10, skip: number = 0): Promise<Task[]> {
     try {
       const params = new URLSearchParams({
         limit: limit.toString(),

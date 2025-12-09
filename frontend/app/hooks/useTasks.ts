@@ -16,6 +16,7 @@ export interface UseTasksReturn {
   completeTask: (id: number) => Promise<void>;
   uncompleteTask: (id: number) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
+  updateTaskStatus: (id: number, status: 'Not Started' | 'In Progress' | 'Completed') => void;
   refreshTasks: () => Promise<void>;
   clearError: () => void;
 }
@@ -35,7 +36,7 @@ export const useTasks = (): UseTasksReturn => {
     try {
       setLoading(true);
       setError(null);
-      const fetchedTasks = await taskService.getTasks(5, 0);
+      const fetchedTasks = await taskService.getTasks(10, 0);
       setTasks(fetchedTasks);
     } catch (err) {
       const errorMessage = handleApiError(err);
@@ -60,7 +61,7 @@ export const useTasks = (): UseTasksReturn => {
     try {
       setError(null);
       const newTask = await taskService.createTask(taskData);
-      setTasks((prevTasks) => [newTask, ...prevTasks].slice(0, 5)); // Keep only 5 most recent
+      setTasks((prevTasks) => [newTask, ...prevTasks].slice(0, 10)); // Keep only 10 most recent
     } catch (err) {
       const errorMessage = handleApiError(err);
       setError(errorMessage);
@@ -123,6 +124,17 @@ export const useTasks = (): UseTasksReturn => {
   }, [fetchTasks]);
 
   /**
+   * Update task status locally (optimistic update)
+   */
+  const updateTaskStatus = useCallback((id: number, status: 'Not Started' | 'In Progress' | 'Completed') => {
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === id ? { ...task, status } : task
+      )
+    );
+  }, []);
+
+  /**
    * Clear error message
    */
   const clearError = useCallback(() => {
@@ -137,6 +149,7 @@ export const useTasks = (): UseTasksReturn => {
     completeTask,
     uncompleteTask,
     deleteTask,
+    updateTaskStatus,
     refreshTasks,
     clearError,
   };
