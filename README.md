@@ -201,11 +201,14 @@ cd frontend
 npm install
 
 # Set environment variables
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+# IMPORTANT: URL must include /api path
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
 
 # Start development server
 npm run dev
 ```
+
+**Note:** The API URL must include the `/api` path. Without it, API calls will fail with 404 errors.
 
 ## Running with Docker Compose (Recommended)
 
@@ -322,8 +325,12 @@ API_PORT=8000
 
 ### `frontend/.env.local`
 ```bash
-# Frontend API endpoint (Docker: use service name 'backend')
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# Frontend API endpoint
+# IMPORTANT: Must include /api path - backend routes are under /api/tasks
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# For Docker deployment, use service name:
+# NEXT_PUBLIC_API_URL=http://backend:8000/api
 ```
 
 ## Stopping Services
@@ -342,8 +349,9 @@ docker-compose down -v
 ### Frontend can't connect to backend
 - Ensure backend is running on port 8000
 - Check `NEXT_PUBLIC_API_URL` in `.env.local`
+- **Important:** URL must include `/api` path: `http://localhost:8000/api`
 - Verify CORS is enabled (enabled by default)
-- For Docker: use `http://backend:8000` instead of localhost
+- For Docker: use `http://backend:8000/api` instead of `http://localhost:8000/api`
 
 ### Database connection error
 - Verify `DATABASE_URL` is correct and complete
