@@ -46,6 +46,8 @@ MANIFEST
 .pytest_cache/
 .coverage
 htmlcov/
+test.db
+.coverage.xml
 
 # Uvicorn
 *.log
