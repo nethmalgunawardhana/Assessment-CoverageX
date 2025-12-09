@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from database import engine, get_db, Base
-from models import Task
+from models import Task, PriorityEnum, StatusEnum
 from schemas import TaskCreate, TaskUpdate, TaskResponse
 
 # Create tables
@@ -32,8 +32,17 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     """Create a new todo task"""
     if not task.title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
-    
-    db_task = Task(title=task.title, description=task.description)
+
+    # Convert string values to enum
+    priority_enum = PriorityEnum[task.priority.replace(" ", "")]
+    status_enum = StatusEnum[task.status.replace(" ", "")]
+
+    db_task = Task(
+        title=task.title,
+        description=task.description,
+        priority=priority_enum,
+        status=status_enum
+    )
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -72,26 +81,34 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 @app.put("/api/tasks/{task_id}", response_model=TaskResponse, tags=["Tasks"])
 def update_task(
-    task_id: int, 
-    task_update: TaskUpdate, 
+    task_id: int,
+    task_update: TaskUpdate,
     db: Session = Depends(get_db)
 ):
     """Update a todo task"""
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     if task_update.title is not None:
         if not task_update.title.strip():
             raise HTTPException(status_code=400, detail="Title cannot be empty")
         db_task.title = task_update.title
-    
+
     if task_update.description is not None:
         db_task.description = task_update.description
-    
+
     if task_update.completed is not None:
         db_task.completed = task_update.completed
-    
+
+    if task_update.priority is not None:
+        priority_enum = PriorityEnum[task_update.priority.replace(" ", "")]
+        db_task.priority = priority_enum
+
+    if task_update.status is not None:
+        status_enum = StatusEnum[task_update.status.replace(" ", "")]
+        db_task.status = status_enum
+
     db.commit()
     db.refresh(db_task)
     return db_task

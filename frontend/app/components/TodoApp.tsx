@@ -1,48 +1,39 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
-
-interface Task {
-  id: number;
-  title: string;
-  description: string;
-  completed: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import {
+  ClipboardList,
+  Loader2,
+  Plus,
+  Calendar,
+  Moon,
+  Sun,
+  Trash2,
+  MoreVertical,
+  Check
+} from 'lucide-react';
+import { useTasks } from '@/app/hooks/useTasks';
+import { Task } from '@/app/services/taskService';
+import { handleApiError } from '@/app/services/taskService';
 
 export default function TodoApp() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const {
+    tasks,
+    loading,
+    createTask,
+    deleteTask: deleteTaskFromService,
+    completeTask,
+    updateTaskStatus,
+  } = useTasks();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [loading, setLoading] = useState(true);
   const [isAddingTask, setIsAddingTask] = useState(false);
-  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
-
-  // Fetch tasks from API
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/tasks?limit=5`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
-      }
-      const data = await response.json();
-      setTasks(data);
-    } catch (err) {
-      console.error('Error fetching tasks:', err);
-      toast.error('Failed to load tasks. Please check your connection.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
+  const [darkMode, setDarkMode] = useState(true);
+  const [priority, setPriority] = useState<'Low' | 'Moderate' | 'High'>('Moderate');
+  const [status, setStatus] = useState<'Not Started' | 'In Progress' | 'Completed'>('Not Started');
 
   const addTask = async () => {
     if (!title.trim()) {
@@ -52,68 +43,68 @@ export default function TodoApp() {
 
     try {
       setIsAddingTask(true);
-      const response = await fetch(`${API_BASE_URL}/api/tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-        }),
+      await createTask({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        priority,
+        status,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create task');
-      }
-
-      const newTask = await response.json();
-      setTasks([newTask, ...tasks]);
       setTitle('');
       setDescription('');
+      setPriority('Moderate');
+      setStatus('Not Started');
       toast.success('Task added successfully!');
-
-      if (tasks.length >= 5) {
-        setTasks((prevTasks) => prevTasks.slice(0, 4));
-      }
     } catch (err) {
       console.error('Error adding task:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create task');
+      toast.error(handleApiError(err));
     } finally {
       setIsAddingTask(false);
     }
   };
 
-  const toggleTask = async (id: number) => {
+  const deleteTask = async (id: number) => {
     try {
-      setCompletingTaskId(id);
-      const task = tasks.find((t) => t.id === id);
-      if (!task) return;
-
-      const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          completed: !task.completed,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update task');
-      }
-
-      setTasks((prevTasks) => prevTasks.filter((t) => t.id !== id));
-      toast.success('Task completed!');
+      setDeletingTaskId(id);
+      await deleteTaskFromService(id);
+      toast.success('Task deleted!');
     } catch (err) {
-      console.error('Error updating task:', err);
-      toast.error('Failed to complete task. Please try again.');
+      console.error('Error deleting task:', err);
+      toast.error(handleApiError(err));
     } finally {
-      setCompletingTaskId(null);
+      setDeletingTaskId(null);
     }
   };
+
+  const markTaskAsDone = async (id: number) => {
+    try {
+      setDeletingTaskId(id);
+      // Optimistically update UI
+      updateTaskStatus(id, 'Completed');
+      await completeTask(id);
+      toast.success('Task completed!');
+    } catch (err) {
+      console.error('Error completing task:', err);
+      toast.error(handleApiError(err));
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const calculateStatusPercentages = () => {
+    if (tasks.length === 0) return { completed: 0, inProgress: 0, notStarted: 0 };
+    
+    const completed = tasks.filter((t) => t.status === 'Completed').length;
+    const inProgress = tasks.filter((t) => t.status === 'In Progress').length;
+    const notStarted = tasks.filter((t) => t.status === 'Not Started').length;
+    
+    return {
+      completed: Math.round((completed / tasks.length) * 100),
+      inProgress: Math.round((inProgress / tasks.length) * 100),
+      notStarted: Math.round((notStarted / tasks.length) * 100),
+    };
+  };
+
+  const statusPercentages = calculateStatusPercentages();
 
   return (
     <>
@@ -122,7 +113,7 @@ export default function TodoApp() {
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#363636',
+            background: darkMode ? '#1f2937' : '#363636',
             color: '#fff',
           },
           success: {
@@ -141,17 +132,318 @@ export default function TodoApp() {
           },
         }}
       />
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-8">
-        <div className="mx-auto flex max-w-6xl gap-8">
-          {/* Add Task Form */}
-          <div className="w-80 rounded-xl bg-white p-8 shadow-lg transition-shadow hover:shadow-xl">
-            <h2 className="mb-6 text-2xl font-bold text-gray-900">
-              ✨ Add a Task
-            </h2>
+      <div className={`min-h-screen lg:h-screen lg:overflow-hidden transition-colors duration-300 ${
+        darkMode
+          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+          : 'bg-gradient-to-br from-gray-50 via-white to-gray-100'
+      } p-6 pb-12 lg:pb-6`}>
+        {/* Header with Theme Toggle */}
+        <div className="mx-auto max-w-7xl mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`rounded-lg p-2 ${darkMode ? 'bg-blue-600' : 'bg-blue-500'}`}>
+              <ClipboardList className="h-7 w-7 text-white" />
+            </div>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              To-Do
+            </h1>
+          </div>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`rounded-lg p-3 transition-all ${
+              darkMode 
+                ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+            }`}
+          >
+            {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        </div>
 
+        <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Task List */}
+          <div className="lg:col-span-2 space-y-4 lg:overflow-y-auto lg:max-h-[calc(100vh-200px)]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long' })}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                  • Today
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const modal = document.getElementById('addTaskModal');
+                  if (modal) modal.style.display = 'flex';
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  darkMode 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-sm font-medium">Add task</span>
+              </button>
+            </div>
+
+            {loading && tasks.length === 0 ? (
+              <div className={`flex flex-col items-center justify-center rounded-2xl p-12 ${
+                darkMode ? 'bg-gray-800/50 border border-blue-400' : 'bg-white border border-blue-200'
+              }`}>
+                <Loader2 className={`mb-4 h-12 w-12 animate-spin ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                <p className={`text-lg font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading your tasks...</p>
+              </div>
+            ) : tasks.filter((task) => task.status !== 'Completed').length === 0 ? (
+              <div className={`flex flex-col items-center justify-center rounded-2xl p-12 ${
+                darkMode ? 'bg-gray-800/50 border border-blue-400' : 'bg-white border border-blue-200'
+              }`}>
+                <p className={`text-xl font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>No active tasks</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tasks.length > 0 ? 'All tasks completed! Great job! 🎉' : 'Create your first task to get started!'}</p>
+              </div>
+            ) : (
+              tasks.filter((task) => task.status !== 'Completed').map((task) => (
+                <div
+                  key={task.id}
+                  className={`rounded-2xl p-6 transition-all hover:shadow-lg ${
+                    darkMode 
+                      ? 'bg-gray-800/50 border border-blue-400 hover:border-blue-300' 
+                      : 'bg-white border border-blue-200 hover:shadow-xl'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="radio"
+                      checked={task.status === 'Completed'}
+                      onChange={() => updateTaskStatus(task.id, task.status === 'Completed' ? 'Not Started' : 'Completed')}
+                      className="mt-1 h-5 w-5 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {task.title}
+                      </h3>
+                      <p className={`text-sm mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {task.description || 'No description provided'}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className={`px-2 py-1 rounded font-medium ${
+                          task.priority === 'High' 
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : task.priority === 'Moderate'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        }`}>
+                          Priority: {task.priority || 'Moderate'}
+                        </span>
+                        <span className={`px-2 py-1 rounded font-medium ${
+                          darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          Status: {task.status || 'Not Started'}
+                        </span>
+                        <span className={`${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Created on: {new Date(task.created_at).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => markTaskAsDone(task.id)}
+                        disabled={deletingTaskId === task.id}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                          darkMode 
+                            ? 'bg-green-600 hover:bg-green-700 text-white' 
+                            : 'bg-green-500 hover:bg-green-600 text-white'
+                        } disabled:opacity-50`}
+                      >
+                        {deletingTaskId === task.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4" />
+                            <span className="text-sm">Done</span>
+                          </>
+                        )}
+                      </button>
+                      {task.status !== 'Completed' && (
+                        <button
+                          onClick={() => deleteTask(task.id)}
+                          disabled={deletingTaskId === task.id}
+                          className={`p-2 rounded-lg transition-all ${
+                            darkMode 
+                              ? 'hover:bg-gray-700 text-gray-400 hover:text-red-400' 
+                              : 'hover:bg-gray-100 text-gray-400 hover:text-red-600'
+                          } disabled:opacity-50`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button className={`p-2 rounded-lg transition-all ${
+                        darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-400'
+                      }`}>
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Right Column - Task Status */}
+          <div className="space-y-6">
+            <div className={`rounded-2xl p-6 ${
+              darkMode ? 'bg-gray-800/50 border border-blue-400' : 'bg-white border border-blue-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-6">
+                <div className={`h-6 w-6 rounded ${darkMode ? 'bg-blue-600' : 'bg-blue-500'}`}></div>
+                <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Task Status
+                </h2>
+              </div>
+
+              {/* Status Circles */}
+              <div className="space-y-4">
+                {/* Completed */}
+                <div className="flex flex-col items-center">
+                  <div className="relative w-24 h-24 mb-2">
+                    <svg className="transform -rotate-90 w-24 h-24">
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke={darkMode ? '#374151' : '#e5e7eb'}
+                        strokeWidth="8"
+                        fill="none"
+                      />
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke="#10b981"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 40}`}
+                        strokeDashoffset={`${2 * Math.PI * 40 * (1 - statusPercentages.completed / 100)}`}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {statusPercentages.completed}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Completed
+                    </span>
+                  </div>
+                </div>
+
+                {/* In Progress */}
+                <div className="flex flex-col items-center">
+                  <div className="relative w-24 h-24 mb-2">
+                    <svg className="transform -rotate-90 w-24 h-24">
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke={darkMode ? '#374151' : '#e5e7eb'}
+                        strokeWidth="8"
+                        fill="none"
+                      />
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke="#3b82f6"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 40}`}
+                        strokeDashoffset={`${2 * Math.PI * 40 * (1 - statusPercentages.inProgress / 100)}`}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {statusPercentages.inProgress}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      In Progress
+                    </span>
+                  </div>
+                </div>
+
+                {/* Not Started */}
+                <div className="flex flex-col items-center">
+                  <div className="relative w-24 h-24 mb-2">
+                    <svg className="transform -rotate-90 w-24 h-24">
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke={darkMode ? '#374151' : '#e5e7eb'}
+                        strokeWidth="8"
+                        fill="none"
+                      />
+                      <circle
+                        cx="48"
+                        cy="48"
+                        r="40"
+                        stroke="#ef4444"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 40}`}
+                        strokeDashoffset={`${2 * Math.PI * 40 * (1 - statusPercentages.notStarted / 100)}`}
+                        className="transition-all duration-1000 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {statusPercentages.notStarted}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Not Started
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Task Modal */}
+        <div
+          id="addTaskModal"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              e.currentTarget.style.display = 'none';
+            }
+          }}
+        >
+          <div className={`rounded-2xl p-8 max-w-md w-full mx-4 ${
+            darkMode ? 'bg-gray-800 border border-blue-400' : 'bg-white border border-blue-200'
+          }`}>
+            <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Add New Task
+            </h2>
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Title *
                 </label>
                 <input
@@ -159,197 +451,106 @@ export default function TodoApp() {
                   placeholder="Enter task title..."
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !isAddingTask) addTask();
-                  }}
-                  disabled={isAddingTask}
-                  className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`w-full rounded-lg px-4 py-3 transition-all ${
+                    darkMode 
+                      ? 'bg-gray-700 border border-blue-400 text-white placeholder-gray-400 focus:border-blue-500' 
+                      : 'bg-gray-50 border border-blue-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-200`}
                 />
               </div>
-
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Description
                 </label>
                 <textarea
                   placeholder="Add details about your task..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  disabled={isAddingTask}
-                  className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
                   rows={4}
+                  className={`w-full rounded-lg px-4 py-3 transition-all ${
+                    darkMode 
+                      ? 'bg-gray-700 border border-blue-400 text-white placeholder-gray-400 focus:border-blue-500' 
+                      : 'bg-gray-50 border border-blue-200 text-gray-900 placeholder-gray-400 focus:border-blue-500'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-200`}
                 />
               </div>
-
-              <button
-                onClick={addTask}
-                disabled={isAddingTask}
-                className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 py-3 font-semibold text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400 disabled:shadow-none"
-              >
-                {isAddingTask ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="h-5 w-5 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Adding...
-                  </span>
-                ) : (
-                  '+ Add Task'
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Task List */}
-          <div className="flex-1 space-y-4">
-            <h2 className="mb-4 text-3xl font-bold text-gray-900">
-              📋 Your Tasks
-            </h2>
-
-            {loading && tasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl bg-white p-12 shadow-lg">
-                <svg
-                  className="mb-4 h-12 w-12 animate-spin text-blue-600"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as 'Low' | 'Moderate' | 'High')}
+                  className={`w-full rounded-lg px-4 py-3 transition-all ${
+                    darkMode 
+                      ? 'bg-gray-700 border border-blue-400 text-white focus:border-blue-500' 
+                      : 'bg-gray-50 border border-blue-200 text-gray-900 focus:border-blue-500'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-200`}
                 >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <p className="text-lg font-medium text-gray-600">Loading your tasks...</p>
+                  <option value="Low">Low</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="High">High</option>
+                </select>
               </div>
-            ) : tasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl bg-white p-12 shadow-lg">
-                <div className="mb-4 text-6xl">📝</div>
-                <p className="mb-2 text-xl font-semibold text-gray-800">No tasks yet</p>
-                <p className="text-gray-600">Create your first task to get started!</p>
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'Not Started' | 'In Progress' | 'Completed')}
+                  className={`w-full rounded-lg px-4 py-3 transition-all ${
+                    darkMode 
+                      ? 'bg-gray-700 border border-blue-400 text-white focus:border-blue-500' 
+                      : 'bg-gray-50 border border-blue-200 text-gray-900 focus:border-blue-500'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-200`}
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
               </div>
-            ) : (
-              tasks.map((task, index) => (
-                <div
-                  key={task.id}
-                  className="group rounded-xl bg-white p-6 shadow-lg transition-all hover:shadow-xl"
-                  style={{
-                    animation: `slideIn 0.3s ease-out ${index * 0.1}s backwards`,
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    const modal = document.getElementById('addTaskModal');
+                    if (modal) modal.style.display = 'none';
                   }}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
+                    darkMode 
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="mb-2 text-xl font-bold text-gray-900">
-                        {task.title}
-                      </h3>
-                      <p className="text-gray-600">
-                        {task.description || (
-                          <span className="italic text-gray-400">No description provided</span>
-                        )}
-                      </p>
-                      <p className="mt-3 text-xs text-gray-400">
-                        Created: {new Date(task.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleTask(task.id)}
-                      disabled={completingTaskId === task.id}
-                      className="flex items-center gap-2 rounded-lg border-2 border-green-500 bg-white px-5 py-2.5 font-semibold text-green-600 transition-all hover:bg-green-500 hover:text-white disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-white"
-                    >
-                      {completingTaskId === task.id ? (
-                        <>
-                          <svg
-                            className="h-4 w-4 animate-spin"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          <span>Processing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <span>Done</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await addTask();
+                    const modal = document.getElementById('addTaskModal');
+                    if (modal) modal.style.display = 'none';
+                  }}
+                  disabled={isAddingTask}
+                  className={`flex-1 py-3 rounded-lg font-semibold text-white transition-all ${
+                    darkMode 
+                      ? 'bg-blue-600 hover:bg-blue-700' 
+                      : 'bg-blue-500 hover:bg-blue-600'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {isAddingTask ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Adding...
+                    </span>
+                  ) : (
+                    'Add Task'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </>
   );
 }
