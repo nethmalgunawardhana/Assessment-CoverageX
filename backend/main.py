@@ -55,7 +55,7 @@ def get_tasks(
         query = query.filter(Task.completed == completed)
     
     # Get only incomplete tasks by default, ordered by creation date (newest first)
-    query = query.filter(Task.completed == False).order_by(desc(Task.created_at))
+    query = query.filter(Task.completed == False).order_by(desc(Task.created_at), desc(Task.id))
     
     tasks = query.offset(skip).limit(limit).all()
     return tasks
