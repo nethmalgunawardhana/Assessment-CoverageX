@@ -11,7 +11,7 @@ test.describe('Todo App - API Integration', () => {
     await page.waitForTimeout(2000);
 
     // Either tasks are loaded or empty state is shown
-    const hasEmptyState = await page.getByText(/No active tasks|Create your first task/i).isVisible();
+    const hasEmptyState = await page.getByText('No active tasks').isVisible().catch(() => false);
     const hasTasks = await page.locator('text=/Created on:/').isVisible().catch(() => false);
 
     expect(hasEmptyState || hasTasks).toBe(true);
