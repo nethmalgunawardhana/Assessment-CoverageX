@@ -32,9 +32,9 @@ test.describe('Todo App - Basic UI', () => {
 
   test('should display Task Status section', async ({ page }) => {
     await expect(page.getByText('Task Status')).toBeVisible();
-    await expect(page.getByText('Completed')).toBeVisible();
-    await expect(page.getByText('In Progress')).toBeVisible();
-    await expect(page.getByText('Not Started')).toBeVisible();
+    await expect(page.getByText('Completed').first()).toBeVisible();
+    await expect(page.getByText('In Progress').first()).toBeVisible();
+    await expect(page.getByText('Not Started').first()).toBeVisible();
   });
 
   test('should show empty state when no tasks', async ({ page }) => {

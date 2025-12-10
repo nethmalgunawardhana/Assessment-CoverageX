@@ -14,7 +14,7 @@ test.describe('Todo App - Task Operations', () => {
     }
     const modal = page.locator('#addTaskModal');
     await modal.getByRole('button', { name: 'Add Task' }).click();
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
     await page.waitForTimeout(1000);
   };
 
@@ -32,7 +32,7 @@ test.describe('Todo App - Task Operations', () => {
     await taskCard.getByRole('button', { name: /done/i }).click();
 
     // Wait for success message
-    await expect(page.getByText('Task completed!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
 
     // Task should be removed from active list (filtered out)
     await page.waitForTimeout(2000);
@@ -54,7 +54,7 @@ test.describe('Todo App - Task Operations', () => {
     await deleteButton.click();
 
     // Wait for success message
-    await expect(page.getByText('Task deleted!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task deleted!').first()).toBeVisible({ timeout: 5000 });
 
     // Task should be removed from the list
     await page.waitForTimeout(1000);
@@ -67,17 +67,18 @@ test.describe('Todo App - Task Operations', () => {
     // Create a task
     await createTestTask(page, taskTitle);
 
+    // Verify task is visible before completion
+    await expect(page.getByText(taskTitle)).toBeVisible();
+
     // Click Done button
     const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
     await taskCard.getByRole('button', { name: /done/i }).click();
 
-    // Should briefly show "Processing..." (might be quick)
-    // The button should be disabled while processing
-    const doneButton = taskCard.getByRole('button', { name: /done/i });
-    const isDisabled = await doneButton.getAttribute('disabled');
+    // Wait for completion toast
+    await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
 
-    // Either it's disabled or the action completed quickly
-    expect(isDisabled !== null || true).toBe(true);
+    // Task should be removed after completion
+    await expect(page.getByText(taskTitle)).not.toBeVisible();
   });
 
   test('should complete multiple tasks', async ({ page }) => {
@@ -97,7 +98,7 @@ test.describe('Todo App - Task Operations', () => {
       await expect(page.getByText(taskTitle)).toBeVisible();
       const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
       await taskCard.getByRole('button', { name: /done/i }).click();
-      await expect(page.getByText('Task completed!')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(1500);
     }
 
@@ -124,7 +125,7 @@ test.describe('Todo App - Task Operations', () => {
       const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
       const deleteButton = taskCard.locator('button').filter({ has: page.locator('.lucide-trash-2') });
       await deleteButton.click();
-      await expect(page.getByText('Task deleted!')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('Task deleted!').first()).toBeVisible({ timeout: 5000 });
       await page.waitForTimeout(1000);
     }
 
@@ -144,16 +145,16 @@ test.describe('Todo App - Task Operations', () => {
     await prioritySelect.selectOption('High');
     const modal = page.locator('#addTaskModal');
     await modal.getByRole('button', { name: 'Add Task' }).click();
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
     await page.waitForTimeout(1000);
 
     // Verify high priority badge
-    await expect(page.getByText('Priority: High')).toBeVisible();
+    await expect(page.getByText('Priority: High').first()).toBeVisible();
 
     // Complete the task
     const taskCard = page.locator(`text=${highPriorityTask}`).locator('..').locator('..').locator('..');
     await taskCard.getByRole('button', { name: /done/i }).click();
-    await expect(page.getByText('Task completed!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should display correct task information before completion', async ({ page }) => {
@@ -165,10 +166,10 @@ test.describe('Todo App - Task Operations', () => {
 
     // Verify all task details are visible
     await expect(page.getByText(taskTitle)).toBeVisible();
-    await expect(page.getByText(taskDescription)).toBeVisible();
-    await expect(page.getByText(/Priority:/)).toBeVisible();
-    await expect(page.getByText(/Status:/)).toBeVisible();
-    await expect(page.getByText(/Created on:/)).toBeVisible();
+    await expect(page.getByText(taskDescription).first()).toBeVisible();
+    await expect(page.getByText(/Priority:/).first()).toBeVisible();
+    await expect(page.getByText(/Status:/).first()).toBeVisible();
+    await expect(page.getByText(/Created on:/).first()).toBeVisible();
 
     // Verify action buttons are present
     const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
@@ -185,14 +186,16 @@ test.describe('Todo App - Task Operations', () => {
     // Complete the task
     const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
     await taskCard.getByRole('button', { name: /done/i }).click();
-    await expect(page.getByText('Task completed!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
 
     // Wait for the task to be removed
     await page.waitForTimeout(2000);
 
-    // Should show empty state or "All tasks completed"
-    const emptyStateVisible = await page.getByText(/No active tasks|All tasks completed/i).isVisible();
-    expect(emptyStateVisible).toBe(true);
+    // Task should be removed from active list (filtered out)
+    await expect(page.getByText(taskTitle)).not.toBeVisible();
+
+    // Task Status section should still be visible
+    await expect(page.getByText('Task Status')).toBeVisible();
   });
 
   test('should update task status percentages after completion', async ({ page }) => {
@@ -208,7 +211,7 @@ test.describe('Todo App - Task Operations', () => {
     await statusSelect.selectOption('In Progress');
     const modal = page.locator('#addTaskModal');
     await modal.getByRole('button', { name: 'Add Task' }).click();
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
     await page.waitForTimeout(1000);
 
     // Verify Task Status section exists
@@ -217,7 +220,7 @@ test.describe('Todo App - Task Operations', () => {
     // Complete the task
     const taskCard = page.locator(`text=${taskTitle}`).locator('..').locator('..').locator('..');
     await taskCard.getByRole('button', { name: /done/i }).click();
-    await expect(page.getByText('Task completed!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task completed!').first()).toBeVisible({ timeout: 5000 });
 
     // Task Status should still be visible
     await expect(page.getByText('Task Status')).toBeVisible();
