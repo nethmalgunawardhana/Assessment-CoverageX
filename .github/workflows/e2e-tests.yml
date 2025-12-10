@@ -1,0 +1,89 @@
+# E2E Tests Workflow
+#
+# This workflow runs end-to-end tests using Playwright
+#
+# Requirements:
+# 1. Set up GitHub Secret 'DATABASE_URL' with your cloud PostgreSQL connection string
+#    - Go to: Repository Settings > Secrets and variables > Actions > New repository secret
+#    - Name: DATABASE_URL
+#    - Value: Your cloud PostgreSQL connection string (e.g., from Neon, AWS RDS, etc.)
+#      Example: postgresql://user:password@host:port/database?sslmode=require
+#
+# 2. The workflow uses Chromium only for faster execution
+#
+# 3. Tests require the backend API to be running with access to the cloud database
+
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, dev, feature/* ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright Browsers
+        working-directory: ./frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Start backend server
+        working-directory: ./backend
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 10
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run E2E tests
+        working-directory: ./frontend
+        run: npm run test:e2e:chromium
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: frontend/test-results/
+          retention-days: 30
