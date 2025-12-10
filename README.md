@@ -27,7 +27,8 @@ A full-stack todo application with React/Next.js frontend, FastAPI backend, and 
 - ✅ Mark tasks as completed (removes from list)
 - ✅ REST API with CRUD operations
 - ✅ PostgreSQL database with proper schema
-- ✅ Comprehensive unit and integration tests
+- ✅ Comprehensive unit and integration tests (Backend & Frontend)
+- ✅ End-to-End (E2E) tests with Playwright (60+ test cases)
 - ✅ Docker containerization
 - ✅ CORS enabled for frontend-backend communication
 
@@ -46,7 +47,9 @@ A full-stack todo application with React/Next.js frontend, FastAPI backend, and 
 - **Psycopg2** - PostgreSQL adapter with SSL support
 
 ### Testing & Deployment
-- **Pytest** - Unit and integration testing
+- **Pytest** - Backend unit and integration testing
+- **Jest & React Testing Library** - Frontend unit testing
+- **Playwright** - End-to-End (E2E) testing with cross-browser support
 - **Docker & Docker Compose** - Containerization
 - **psycopg2** - PostgreSQL adapter
 
@@ -201,11 +204,14 @@ cd frontend
 npm install
 
 # Set environment variables
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+# IMPORTANT: URL must include /api path
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
 
 # Start development server
 npm run dev
 ```
+
+**Note:** The API URL must include the `/api` path. Without it, API calls will fail with 404 errors.
 
 ## Running with Docker Compose (Recommended)
 
@@ -241,7 +247,9 @@ docker-compose down
 
 ## Testing
 
-### Run Backend Tests
+### Backend Tests
+
+#### Run Backend Unit Tests
 ```bash
 cd backend
 
@@ -255,7 +263,7 @@ pytest test_main.py -v --cov=. --cov-report=html
 # Open htmlcov/index.html in browser
 ```
 
-### Test Coverage
+#### Backend Test Coverage
 The backend includes 18 comprehensive test cases covering:
 - ✅ Creating tasks
 - ✅ Fetching tasks (filtering by completion status)
@@ -266,6 +274,125 @@ The backend includes 18 comprehensive test cases covering:
 - ✅ Edge cases (empty titles, non-existent tasks, etc.)
 
 **Target Coverage: > 90%**
+
+### Frontend Tests
+
+#### Run Frontend Unit Tests
+```bash
+cd frontend
+
+# Run all unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+#### Frontend Unit Test Coverage
+The frontend includes comprehensive unit tests for the TodoApp component covering:
+- ✅ Component rendering and UI elements
+- ✅ Dark mode toggle functionality
+- ✅ Task creation with validation
+- ✅ Task operations (complete, delete)
+- ✅ Modal interactions
+- ✅ Form validation and error handling
+- ✅ Status percentage calculations
+- ✅ Loading states
+
+### End-to-End (E2E) Tests
+
+#### Prerequisites for E2E Tests
+1. **Backend must be running**:
+   ```bash
+   cd backend
+   .\venv\Scripts\activate  # Windows
+   # or
+   source venv/bin/activate  # Linux/Mac
+
+   uvicorn main:app --reload --port 8000
+   ```
+
+2. **Install Playwright browsers** (first time only):
+   ```bash
+   cd frontend
+   npx playwright install chromium
+   ```
+
+#### Run E2E Tests
+```bash
+cd frontend
+
+# Run all E2E tests (headless)
+npm run test:e2e
+
+# Run E2E tests with UI (interactive, recommended for debugging)
+npm run test:e2e:ui
+
+# Run E2E tests with visible browser
+npm run test:e2e:headed
+
+# Run E2E tests in debug mode
+npm run test:e2e:debug
+
+# Run E2E tests on Chromium only (faster)
+npm run test:e2e:chromium
+
+# View E2E test report
+npm run test:e2e:report
+```
+
+#### E2E Test Coverage
+The E2E test suite includes 60+ comprehensive tests across 5 test files:
+
+**1. Basic UI Tests** (`app.spec.ts`)
+- Application loading and layout
+- Dark mode verification
+- Task Status section display
+- Empty state handling
+- Responsive design (desktop, tablet, mobile)
+
+**2. Add Task Functionality** (`add-task.spec.ts`)
+- Modal open/close operations
+- Form validation
+- Task creation with title and description
+- Priority and status selection
+- Form reset after creation
+- Multiple task creation
+
+**3. Task Operations** (`task-operations.spec.ts`)
+- Marking tasks as complete
+- Deleting tasks
+- Loading states during operations
+- Multiple task operations
+- Status percentage updates
+
+**4. UI Interactions** (`ui-interactions.spec.ts`)
+- Dark/Light mode toggle
+- Theme consistency
+- Toast notifications
+- Button interactions
+- Date display formatting
+- Mobile responsiveness
+
+**5. API Integration** (`api-integration.spec.ts`)
+- GET/POST/PUT/DELETE request validation
+- Request payload verification
+- Network delay handling
+- Data persistence
+- Error handling
+- Special character encoding
+
+**E2E Test Notes**:
+- Tests require backend API running on `http://localhost:8000`
+- Frontend dev server auto-starts via Playwright config
+- Tests use real API calls (not mocked)
+- Comprehensive coverage of user workflows
+- Cross-browser testing supported (Chromium, Firefox, WebKit)
+
+For detailed E2E testing documentation, see [`frontend/e2e/README.md`](frontend/e2e/README.md)
 
 ## Frontend Components
 
@@ -322,8 +449,12 @@ API_PORT=8000
 
 ### `frontend/.env.local`
 ```bash
-# Frontend API endpoint (Docker: use service name 'backend')
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# Frontend API endpoint
+# IMPORTANT: Must include /api path - backend routes are under /api/tasks
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# For Docker deployment, use service name:
+# NEXT_PUBLIC_API_URL=http://backend:8000/api
 ```
 
 ## Stopping Services
@@ -342,8 +473,9 @@ docker-compose down -v
 ### Frontend can't connect to backend
 - Ensure backend is running on port 8000
 - Check `NEXT_PUBLIC_API_URL` in `.env.local`
+- **Important:** URL must include `/api` path: `http://localhost:8000/api`
 - Verify CORS is enabled (enabled by default)
-- For Docker: use `http://backend:8000` instead of localhost
+- For Docker: use `http://backend:8000/api` instead of `http://localhost:8000/api`
 
 ### Database connection error
 - Verify `DATABASE_URL` is correct and complete
