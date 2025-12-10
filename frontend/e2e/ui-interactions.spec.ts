@@ -216,9 +216,10 @@ test.describe('Todo App - UI Interactions', () => {
     await expect(page.getByText('Priority').first()).toBeVisible();
     await expect(page.getByText('Status').first()).toBeVisible();
 
-    // Check buttons
-    await expect(page.getByRole('button', { name: /cancel/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^add task$/i })).toBeVisible();
+    // Check buttons (scope to modal to avoid matching header button)
+    const modal = page.locator('#addTaskModal');
+    await expect(modal.getByRole('button', { name: /cancel/i })).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Add Task' })).toBeVisible();
   });
 
   test('should maintain scroll position when adding tasks on mobile', async ({ page }) => {
