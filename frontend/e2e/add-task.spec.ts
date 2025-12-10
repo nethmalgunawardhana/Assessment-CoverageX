@@ -67,7 +67,7 @@ test.describe('Todo App - Add Task Functionality', () => {
     await modal.getByRole('button', { name: 'Add Task' }).click();
 
     // Wait for success message
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
     // Modal should close
     await expect(page.getByText('Add New Task')).not.toBeVisible();
@@ -92,7 +92,7 @@ test.describe('Todo App - Add Task Functionality', () => {
     await modal.getByRole('button', { name: 'Add Task' }).click();
 
     // Wait for success message
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
     // Both title and description should be visible
     await expect(page.getByText(taskTitle)).toBeVisible({ timeout: 5000 });
@@ -117,11 +117,11 @@ test.describe('Todo App - Add Task Functionality', () => {
     await modal.getByRole('button', { name: 'Add Task' }).click();
 
     // Wait for success
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
     // Check if the task appears with High priority
     await expect(page.getByText(taskTitle)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Priority: High')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Priority: High').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should add task with custom status', async ({ page }) => {
@@ -142,11 +142,11 @@ test.describe('Todo App - Add Task Functionality', () => {
     await modal.getByRole('button', { name: 'Add Task' }).click();
 
     // Wait for success
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
     // Check if the task appears with In Progress status
     await expect(page.getByText(taskTitle)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Status: In Progress')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Status: In Progress').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should reset form after successful task creation', async ({ page }) => {
@@ -160,7 +160,7 @@ test.describe('Todo App - Add Task Functionality', () => {
     await modal.getByRole('button', { name: 'Add Task' }).click();
 
     // Wait for success
-    await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
     // Open modal again
     await page.getByRole('button', { name: /add task/i }).click();
@@ -192,11 +192,11 @@ test.describe('Todo App - Add Task Functionality', () => {
       const modal = page.locator('#addTaskModal');
       await modal.getByRole('button', { name: 'Add Task' }).click();
 
-      // Wait for success
-      await expect(page.getByText('Task added successfully!')).toBeVisible({ timeout: 5000 });
+      // Wait for success (use .first() to handle multiple toasts)
+      await expect(page.getByText('Task added successfully!').first()).toBeVisible({ timeout: 5000 });
 
-      // Wait for toast to disappear
-      await page.waitForTimeout(1000);
+      // Wait for toast to disappear before adding next task
+      await page.getByText('Task added successfully!').first().waitFor({ state: 'hidden', timeout: 5000 });
     }
 
     // All tasks should be visible
