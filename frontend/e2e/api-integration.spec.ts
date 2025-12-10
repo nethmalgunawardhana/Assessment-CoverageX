@@ -261,7 +261,7 @@ test.describe('Todo App - API Integration', () => {
 
   test('should properly encode special characters in API requests', async ({ page }) => {
     const taskTitle = `Special Chars Test ${Date.now()}`;
-    const taskDescription = 'Testing special chars: @#$%^&*()_+{}|:"<>?';
+    const taskDescription = `Testing special chars: @#$%^&*()_+{}|:"<>? ${Date.now()}`;
 
     await page.getByRole('button', { name: /add task/i }).click();
     await page.getByPlaceholder('Enter task title...').fill(taskTitle);

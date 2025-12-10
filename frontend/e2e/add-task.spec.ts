@@ -78,7 +78,7 @@ test.describe('Todo App - Add Task Functionality', () => {
 
   test('should successfully add a task with title and description', async ({ page }) => {
     const taskTitle = `E2E Task with Description ${Date.now()}`;
-    const taskDescription = 'This is a detailed description for the E2E test task';
+    const taskDescription = `This is a detailed description for the E2E test task ${Date.now()}`;
 
     // Open modal
     await page.getByRole('button', { name: /add task/i }).click();
